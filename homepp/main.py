@@ -14,7 +14,8 @@ async def connect(url: str, key: str) -> WebSocketClientProtocol:
     while True:
         try:
             return await ws_connect(url, extra_headers={"HardwareKey": key})
-        except ConnectionRefusedError:
+        except ConnectionRefusedError as e:
+            logger.error(e)
             logger.info("Reconnecting...")
 
 
@@ -69,7 +70,7 @@ async def main(ws_url: str, key: str, wait_seconds: int) -> None:
 
 if __name__ == "__main__":
     # TODO: move to environment
-    server = "ws://localhost:8000"
+    server = "ws://0.0.0.0:8010"
     key = "123"
     wait_seconds = 5
     logging_config_path = "homepp/config/logging_config.ini"
