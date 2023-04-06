@@ -1,7 +1,9 @@
 import json
 import asyncio
 import random
+import string
 import websockets
+import aioconsole
 import logging
 import logging.config
 from websockets.client import connect as ws_connect
@@ -19,10 +21,14 @@ async def connect(url: str, key: str) -> WebSocketClientProtocol:
             logger.info("Reconnecting...")
 
 
-async def send_data_from_sensors(ws: WebSocketClientProtocol) -> None:
+async def send_data_from_sensors(ws: WebSocketClientProtocol, name_sensor: string) -> None:
     while True:
-        events = await read_sensors()
-        await ws.send(events)
+        events = await aioconsole.ainput()
+        data = {
+            "type": name_sensor,
+            "message": events,
+        }
+        await ws.send(json.dumps(data))
 
 
 async def listen_aggregator(ws: WebSocketClientProtocol) -> None:
@@ -43,6 +49,7 @@ async def read_sensors() -> str:
 
 
 async def main(ws_url: str, key: str, wait_seconds: int) -> None:
+    name_sensor = input('Введите название контроллера: ')
     websocket = None
     while wait_seconds:
         try:
@@ -59,7 +66,7 @@ async def main(ws_url: str, key: str, wait_seconds: int) -> None:
     else:
         try:
             await asyncio.gather(
-                send_data_from_sensors(websocket), listen_aggregator(websocket)
+                send_data_from_sensors(websocket, name_sensor), listen_aggregator(websocket)
             )
         except websockets.exceptions.ConnectionClosed:
             logger.info("Connection closed by server")

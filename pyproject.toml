@@ -9,6 +9,7 @@ packages = [{include = "homepp_client"}]
 [tool.poetry.dependencies]
 python = "3.11"
 websockets = "^10.4"
+aioconsole = "^0.6.1"
 
 [tool.poetry.group.dev.dependencies]
 black = "^23.1.0"
