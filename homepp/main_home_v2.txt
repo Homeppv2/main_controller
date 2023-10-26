@@ -1,0 +1,115 @@
+import json
+import asyncio
+import random
+import websockets
+import aioserial
+import logging
+import logging.config
+from websockets.client import connect as ws_connect
+from websockets.client import WebSocketClientProtocol
+
+logger = logging.getLogger()
+
+
+async def connect(url: str, key: str) -> WebSocketClientProtocol:
+    while True:
+        try:
+            return await ws_connect(url, extra_headers={"HardwareKey": key})
+        except ConnectionRefusedError as e:
+            logger.error(e)
+            logger.info("Reconnecting...")
+
+
+async def send_data_from_sensors(ws: WebSocketClientProtocol) -> None:
+	serial_port = aioserial.AioSerial("/dev/ttyAMA0", 115200)  # Open port with baud rate
+	while True:
+		
+		received_data = (await serial_port.readline_async()).decode('utf-8')
+		if len(received_data) == 0: continue# read serial port asynchronously
+     #  data_left = serial_port.in_waiting          # check for remaining byte
+      #  if data_left:
+            #received_data +=( await serial_port.read_async(data_left)).decode()
+		
+		received_data = received_data.split()
+		print(received_data)
+		#if int(received_data[0]) == 0: received_data = 200
+		if int(received_data[0]) == 3:
+			data = {"type": "air_quality", "message": {
+				"temp": float(received_data[1]),
+				"humidity": float(received_data[2]),
+				"pressure": float(received_data[3]),
+				"VOC": float(received_data[4]),
+				"alho": float(received_data[5]),
+				"metan": float(received_data[6]),
+				"co": float(received_data[7]),
+				"co2": float(received_data[8]),
+				"fire": float(received_data[9]),
+				}}
+			#print(data)
+		#data = {"type": random.choice(['gas', 'water', 'smoke']), "message": int(received_data)}
+		else:
+			if (int(received_data[0])==0):
+				received_data = 200
+			data = {"type": 'water', "message": received_data}
+		#data = {'type': 'water',  "message": 0}
+		await ws.send(json.dumps(data));
+		await asyncio.sleep(1)
+async def listen_aggregator(ws: WebSocketClientProtocol) -> None:
+	while True:
+		text = await ws.recv()
+		data = json.loads(text)
+		print(data)
+		#match data:
+			#case {"type": "error"}:
+#                 logger.info("Received error: %s" % data["detail"])
+
+
+# TODO: add asyncio support for read data from sensors
+async def read_sensors() -> str:
+    await asyncio.sleep(2)
+    return json.dumps(
+        {"type": "some_sensor", "message": random.randint(0, 150)}
+    )
+
+
+async def main(ws_url: str, key: str, wait_seconds: int) -> None:
+    websocket = None
+    while wait_seconds:
+        try:
+            websocket = await connect(ws_url, key)
+            logger.info("Connected to websocket")
+            wait_seconds = 0
+        except OSError:
+            logger.info("Trying to connect: %s" % ws_url)
+            await asyncio.sleep(1)
+            wait_seconds -= 1
+
+    if not websocket:
+        logger.info("Connection failed")
+    else:
+        try:
+            await asyncio.gather(
+                send_data_from_sensors(websocket), 
+            )
+        except websockets.exceptions.ConnectionClosed:
+            logger.info("Connection closed by server")
+        finally:
+            # for aggregator disconnect exception handling
+            await websocket.close(1002)
+
+
+if __name__ == "__main__":
+    # TODO: move to environment
+    server = "ws://194.58.98.141:8010"
+
+    key = "123"
+    wait_seconds = 7
+    logging_config_path = "homepp/config/logging_config.ini"
+
+    logging.config.fileConfig(logging_config_path)
+    try:
+        logger.info("Started controller")
+        asyncio.run(main(server, key, wait_seconds))
+    except KeyboardInterrupt:
+        logger.info("Shutdown controller")
+
