@@ -1,89 +1,56 @@
-import json
-import asyncio
-import random
+import os
+
 import websockets
-import aioconsole
-import logging
-import logging.config
-from websockets.client import connect as ws_connect
-from websockets.client import WebSocketClientProtocol
 
-logger = logging.getLogger()
+import asyncio
+import custom_logger
+import websocket_client
+import sensors
+
+logger = custom_logger.setup_logger()
 
 
-async def connect(url: str, key: str) -> WebSocketClientProtocol:
+async def main():
+    websocket_url = os.getenv("WEBSOCKET_URL", "ws://0.0.0.0:8010")
+    hardware_key = os.getenv("HARDWARE_KEY", "123")
+
     while True:
         try:
-            return await ws_connect(url, extra_headers={"HardwareKey": key})
-        except ConnectionRefusedError as e:
-            logger.error(e)
-            logger.info("Reconnecting...")
-
-
-async def send_data_from_sensors(ws: WebSocketClientProtocol) -> None:
-    while True:
-        events = await aioconsole.ainput()
-        name_sensor = await aioconsole.ainput()
-        data = {
-            "type": name_sensor,
-            "message": events,
-        }
-        await ws.send(json.dumps(data))
-
-
-async def listen_aggregator(ws: WebSocketClientProtocol) -> None:
-    while True:
-        text = await ws.recv()
-        data = json.loads(text)
-        match data:
-            case {"type": "error"}:
-                logger.info("Received error: %s" % data["detail"])
-
-
-# TODO: add asyncio support for read data from sensors
-async def read_sensors() -> str:
-    await asyncio.sleep(2)
-    return json.dumps(
-        {"type": "some_sensor", "message": random.randint(0, 150)}
-    )
-
-
-async def main(ws_url: str, key: str, wait_seconds: int) -> None:
-    websocket = None
-    while wait_seconds:
-        try:
-            websocket = await connect(ws_url, key)
-            logger.info("Connected to websocket")
-            wait_seconds = 0
-        except OSError:
-            logger.info("Trying to connect: %s" % ws_url)
-            await asyncio.sleep(1)
-            wait_seconds -= 1
-
-    if not websocket:
-        logger.info("Connection failed")
-    else:
-        try:
-            await asyncio.gather(
-                send_data_from_sensors(websocket), listen_aggregator(websocket)
-            )
-        except websockets.exceptions.ConnectionClosed:
-            logger.info("Connection closed by server")
+            websocket = await websocket_client.connect_websocket(websocket_url, hardware_key)
+            if websocket:
+                await asyncio.gather(
+                    send_data(websocket),
+                    receive_data(websocket)
+                )
+        except asyncio.CancelledError:
+            raise
+        except Exception as e:
+            logger.error("An error occurred: %s", e)
         finally:
-            # for aggregator disconnect exception handling
-            await websocket.close(1002)
+            logger.info("Reconnecting...")
+            await asyncio.sleep(1)
+
+
+async def send_data(websocket):
+    try:
+        while True:
+            sensor_data = await sensors.read_sensor_data()
+            await websocket_client.send_data(websocket, sensor_data)
+    except websockets.exceptions.ConnectionClosed:
+        logger.error("Connection to server closed")
+
+
+async def receive_data(websocket):
+    try:
+        while True:
+            received_data = await websocket_client.receive_data(websocket)
+            logger.info("Received data from server: %s", received_data)
+    except websockets.exceptions.ConnectionClosed:
+        logger.error("Connection to server closed")
 
 
 if __name__ == "__main__":
-    # TODO: move to environment
-    server = "ws://0.0.0.0:8010"
-    key = "123"
-    wait_seconds = 5
-    logging_config_path = "homepp/config/logging_config.ini"
+    asyncio.run(main())
 
-    logging.config.fileConfig(logging_config_path)
-    try:
-        logger.info("Started controller")
-        asyncio.run(main(server, key, wait_seconds))
-    except KeyboardInterrupt:
-        logger.info("Shutdown controller")
+
+
