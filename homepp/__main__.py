@@ -11,12 +11,14 @@ logger = custom_logger.setup_logger()
 
 
 async def main():
-    websocket_url = os.getenv("WEBSOCKET_URL", "ws://0.0.0.0:8010")
-    hardware_key = os.getenv("HARDWARE_KEY", "123")
+    # todo: move to separate config file
+    WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "123")
+    HARDWARE_KEY = os.getenv("HARDWARE_KEY", "1234")
+    # DEBUG = os.getenv("DEBUG", False)
 
     while True:
         try:
-            websocket = await websocket_client.connect_websocket(websocket_url, hardware_key)
+            websocket = await websocket_client.connect_websocket(WEBSOCKET_URL, HARDWARE_KEY)
             if websocket:
                 await asyncio.gather(
                     send_data(websocket),
@@ -28,16 +30,18 @@ async def main():
             logger.error("An error occurred: %s", e)
         finally:
             logger.info("Reconnecting...")
-            await asyncio.sleep(1)
+            await asyncio.sleep(3)
 
 
 async def send_data(websocket):
     try:
         while True:
-            sensor_data = await sensors.read_sensor_data()
+            sensor_data: dict = await sensors.read_sensor_data()
             await websocket_client.send_data(websocket, sensor_data)
     except websockets.exceptions.ConnectionClosed:
         logger.error("Connection to server closed")
+    except Exception as e:
+        logger.error("An error occurred while sending sensor data: %s", e)
 
 
 async def receive_data(websocket):
@@ -50,6 +54,7 @@ async def receive_data(websocket):
 
 
 if __name__ == "__main__":
+    logger.info("Starting websocket client")
     asyncio.run(main())
 
 
