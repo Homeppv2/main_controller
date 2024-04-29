@@ -37,6 +37,7 @@ async def read_sensor_data() -> dict:
 
 
 def parse_received_data(received_frame):
+    print(received_frame)
     received_frame = [x if x != "0" else "00" for x in received_frame]
     received_data = received_frame[4:]
     parsed_data = {}
