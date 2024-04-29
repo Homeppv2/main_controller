@@ -12,78 +12,79 @@ GENERATE_FAKE_VALUES = bool(int(os.getenv("GENERATE_FAKE_VALUES", False)))
 
 
 async def read_sensor_data() -> dict:
-    try:
-        serial_port = aioserial.AioSerial("/dev/ttyAMA0", 115200)
-        received_data = (await serial_port.readline_async()).decode('utf-8')
-        parsed_data = parse_received_data(received_data)
+    serial_port = aioserial.AioSerial("/dev/ttyAMA0", 115200)
+    received_data = (await serial_port.readline_async()).decode('utf-8')
+    parsed_data = parse_received_data(received_data)
 
-        return parsed_data["sensor_info"] + parsed_data["sensor_data"]
-        # todo: one, two, three things
 
-        # return formatted_data
+    ids_to_strings_dict = {
+        16: "one",
+        17: "two",
+        18: "three"
+    }
 
-    except Exception as e:
-        print(f"Error reading sensor data: {e}")
-        return {}
+    formatted_data = {ids_to_strings_dict[parsed_data["sensor_info"]["id"]]: parsed_data["sensor_info"]}
+    # todo: one, two, three things
+    if parsed_data["sensor_info"]["id"] == 16:
+        ...
+    elif parsed_data["sensor_info"]["id"] == 17:
+
+        formatted_data["controlermodule"] = parsed_data["sensor_data"]
+
+    return formatted_data
+
+
 
 
 def parse_received_data(received_frame):
     received_frame = [x if x != "0" else "00" for x in received_frame]
     received_data = received_frame[4:]
     parsed_data = {}
-    try:
-        parsed_data["sensor_info"] = {"id": int((received_frame[0] + received_frame[1])[::-1], 16),
-                                      "number": int((received_frame[2] + received_frame[3])[::-1], 16),
-                                      "status": int((received_data[0] + received_data[1])[::-1], 16),
-                                      "charge": int(received_data[2][::-1], 16)}
+    parsed_data["sensor_info"] = {"id": int((received_frame[0] + received_frame[1])[::-1], 16),
+                                  "number": int((received_frame[2] + received_frame[3])[::-1], 16),
+                                  "status": int((received_data[0] + received_data[1])[::-1], 16),
+                                  "charge": int(received_data[2][::-1], 16)}
 
-        # Разбор данных в зависимости от типа
-        if parsed_data["sensor_info"]["id"] == 16:  # Датчик протечки
-            parsed_data["sensor_data"]["name"] = "Датчик протечки"
-            parsed_data["sensor_data"] = {
-                "leak": int(received_data[3], 8)
-            }
-        elif parsed_data["sensor_info"]["id"] == 17:  # Модульный датчик
-            print(
-                "".join(received_data[3:7][::-1]),
-                "".join(received_data[7:11][::-1]),
-                "".join(received_data[11:15][::-1]),
-                "".join(received_data[15:19][::-1]),
-            )
-            parsed_data["sensor_info"]["name"] = "Модульный датчик"
-            parsed_data["sensor_data"] = {
-                "temperature": int("".join(received_data[3:7][::-1]), 16),
-                "humidity": int("".join(received_data[7:11][::-1]), 16),
-                "pressure": int("".join(received_data[11:15][::-1]), 16),
-                "gas": int("".join(received_data[15:19][::-1]), 16)
-            }
-
-
-        elif parsed_data["sensor_info"]["id"] == 18:  # Датчик окружающей среды
-            parsed_data["sensor_info"]["name"] = "Датчик окружающей среды"
-
-            parsed_data["sensor_data"] = {
-                "temperature": int("".join(received_data[3:7][::-1]), 16),
-                "humidity": int("".join(received_data[7:11][::-1]), 16),
-                "pressure": int("".join(received_data[11:15][::-1]), 16),
-                "VOC": int("".join(received_data[15:19][::-1]), 16),
-                "gas1": int("".join(received_data[19:23][::-1]), 16),
-                "gas2": int("".join(received_data[23:27][::-1]), 16),
-                "gas3": int("".join(received_data[27:31][::-1]), 16),
-                "pm1": int("".join(received_data[31:33][::-1]), 16),
-                "pm25": int("".join(received_data[33:35][::-1]), 16),
-                "pm10": int("".join(received_data[35:37][::-1]), 16),
-                "fire": int("".join(received_data[37:39][::-1]), 16),
-                "smoke": int(received_data[39], 16)
-            }
+    # Разбор данных в зависимости от типа
+    if parsed_data["sensor_info"]["id"] == 16:  # Датчик протечки
+        parsed_data["sensor_data"]["name"] = "Датчик протечки"
+        parsed_data["sensor_data"] = {
+            "leak": int(received_data[3], 8)
+        }
+    elif parsed_data["sensor_info"]["id"] == 17:  # Модульный датчик
+        print(
+            "".join(received_data[3:7][::-1]),
+            "".join(received_data[7:11][::-1]),
+            "".join(received_data[11:15][::-1]),
+            "".join(received_data[15:19][::-1]),
+        )
+        parsed_data["sensor_info"]["name"] = "Модульный датчик"
+        parsed_data["sensor_data"] = {
+            "temperature": int("".join(received_data[3:7][::-1]), 16),
+            "humidity": int("".join(received_data[7:11][::-1]), 16),
+            "pressure": int("".join(received_data[11:15][::-1]), 16),
+            "gas": int("".join(received_data[15:19][::-1]), 16)
+        }
 
 
-    except IndexError:
-        logger.error("Error parsing data: not enough data")
+    elif parsed_data["sensor_info"]["id"] == 18:  # Датчик окружающей среды
+        parsed_data["sensor_info"]["name"] = "Датчик окружающей среды"
 
-    except ValueError as e:
-        logger.error("Error parsing data: invalid format")
-        raise e
+        parsed_data["sensor_data"] = {
+            "temperature": int("".join(received_data[3:7][::-1]), 16),
+            "humidity": int("".join(received_data[7:11][::-1]), 16),
+            "pressure": int("".join(received_data[11:15][::-1]), 16),
+            "VOC": int("".join(received_data[15:19][::-1]), 16),
+            "gas1": int("".join(received_data[19:23][::-1]), 16),
+            "gas2": int("".join(received_data[23:27][::-1]), 16),
+            "gas3": int("".join(received_data[27:31][::-1]), 16),
+            "pm1": int("".join(received_data[31:33][::-1]), 16),
+            "pm25": int("".join(received_data[33:35][::-1]), 16),
+            "pm10": int("".join(received_data[35:37][::-1]), 16),
+            "fire": int("".join(received_data[37:39][::-1]), 16),
+            "smoke": int(received_data[39], 16)
+        }
+
 
     return parsed_data
 
