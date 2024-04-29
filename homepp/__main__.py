@@ -26,8 +26,7 @@ async def main():
                 )
         except asyncio.CancelledError:
             raise
-        except Exception as e:
-            logger.error("An error occurred: %s", e)
+
         finally:
             logger.info("Reconnecting...")
             await asyncio.sleep(3)
@@ -40,9 +39,6 @@ async def send_data(websocket):
             await websocket_client.send_data(websocket, sensor_data)
     except websockets.exceptions.ConnectionClosed:
         logger.error("Connection to server closed")
-    except Exception as e:
-        logger.error("An error occurred while sending sensor data: %s", e)
-
 
 async def receive_data(websocket):
     try:
