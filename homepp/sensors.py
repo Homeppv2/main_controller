@@ -14,7 +14,7 @@ GENERATE_FAKE_VALUES = bool(int(os.getenv("GENERATE_FAKE_VALUES", False)))
 async def read_sensor_data() -> dict:
     serial_port = aioserial.AioSerial("/dev/ttyAMA0", 115200)
     received_data = (await serial_port.readline_async()).decode('utf-8')
-    parsed_data = parse_received_data(received_data)
+    parsed_data = parse_received_data(received_data.split())
 
 
     ids_to_strings_dict = {
