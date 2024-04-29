@@ -44,12 +44,12 @@ def parse_received_data(received_frame):
                 "leak": int(received_data[3], 8)
             }
         elif parsed_data["sensor_info"]["id"] == 17:  # Модульный датчик
-            # print(
-            #     "".join(received_data[3:7][::-1]),
-            #     "".join(received_data[7:11][::-1]),
-            #     "".join(received_data[11:15][::-1]),
-            #     "".join(received_data[15:19][::-1]),
-            # )
+            print(
+                "".join(received_data[3:7][::-1]),
+                "".join(received_data[7:11][::-1]),
+                "".join(received_data[11:15][::-1]),
+                "".join(received_data[15:19][::-1]),
+            )
             parsed_data["sensor_info"]["name"] = "Модульный датчик"
             parsed_data["sensor_data"] = {
                 "temperature": int("".join(received_data[3:7][::-1]), 16),
