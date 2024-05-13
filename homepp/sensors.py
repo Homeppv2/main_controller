@@ -32,35 +32,43 @@ async def read_sensor_data() -> dict:
         17: "two",
         18: "three"
     }
+    ids_to_names_dict = {
+        16: "controlerleack",
+        17: "controlermodule",
+        18: "controlerenviroment",
 
-    formatted_data = {ids_to_strings_dict[parsed_data["sensor_info"]["id"]]: parsed_data["sensor_info"]}
-    # todo: one, two, three things
-    if parsed_data["sensor_info"]["id"] == 16:
-        ...
-    elif parsed_data["sensor_info"]["id"] == 17:
+    }
 
-        formatted_data["controlermodule"] = parsed_data["sensor_data"]
+    controller_data_name = ids_to_names_dict[parsed_data["sensor_info"]["type"]]
+    sensor_data = parsed_data.get('sensor_data')
 
+    parsed_data["sensor_info"][controller_data_name] = sensor_data
+
+    formatted_data = {
+        ids_to_strings_dict[parsed_data["sensor_info"]["type"]]: parsed_data["sensor_info"]
+
+    }
     return formatted_data
 
 
 def parse_received_data(received_frame):
+    logger.debug(f"Got new data to parse: {received_frame}")
     received_frame = [("0" + x) if len(x) == 1 else x for x in received_frame]
     parsed_frame: dict[str: int | float] = {"sensor_info": {
         "type": int("".join(received_frame[0:2][::-1]), 16),
         "number": int("".join(received_frame[2:4][::-1]), 16),
         "status": int("".join(received_frame[4:6][::-1]), 16),
-        "charge": int(received_frame[6], 16)
+        "charge": int(received_frame[6], 16),
+        "temperature_MK": int(received_frame[7], 8)
     }}
 
     # Разбор данных в зависимости от типа
     if parsed_frame["sensor_info"]["type"] == 16:
-        parsed_frame["sensor_info"]["name"] = "Датчик протечки"
         parsed_frame["sensor_data"] = {
-            "leak": int(received_frame[7], 16)
+            "leack": int(received_frame[8], 16)
         }
     elif parsed_frame["sensor_info"]["type"] == 17:
-        parsed_frame["sensor_info"]["name"] = "Модульный датчик"
+
         parsed_frame["sensor_data"] = {
             "temperature": "%.2f" % convert_hex_to_float("".join(received_frame[8:12])),
             "humidity": "%.2f" % convert_hex_to_float("".join(received_frame[12:16])),
@@ -69,7 +77,6 @@ def parse_received_data(received_frame):
         }
 
     elif parsed_frame["sensor_info"]["type"] == 18:
-        parsed_frame["sensor_info"]["name"] = "Датчик окружающей среды"
         parsed_frame["sensor_data"] = {
             "temperature": "%.2f" % convert_hex_to_float("".join(received_frame[8:12])),
             "humidity": "%.2f" % convert_hex_to_float("".join(received_frame[12:16])),
@@ -84,26 +91,26 @@ def parse_received_data(received_frame):
             "fire": int("".join(received_frame[42:44][::-1]), 16),
             "smoke": int("".join(received_frame[44:46][::-1]), 16),
         }
-    elif parsed_frame["sensor_info"]["type"] == 19:
-        parsed_frame["sensor_info"]["name"] = "Датчик дыма и пожара"
-        parsed_frame["sensor_data"] = {
-            "smoke": int("".join(received_frame[8:10][::-1]), 16),
-            "fire1": int("".join(received_frame[10:12][::-1]), 16),
-            "fire2": int("".join(received_frame[12:14][::-1]), 16),
-            "fire3": int("".join(received_frame[14:16][::-1]), 16),
-            "fire4": int("".join(received_frame[16:18][::-1]), 16),
-            "brightness": int("".join(received_frame[18:20][::-1]), 16),
-        }
-    elif parsed_frame["sensor_info"]["type"] == 20:
-        parsed_frame["sensor_info"]["name"] = "Датчик CO2"
-        parsed_frame["sensor_data"] = {
-            "temperature": "%.2f" % convert_hex_to_float("".join(received_frame[8:12])),
-            "humidity": "%.2f" % convert_hex_to_float("".join(received_frame[12:16])),
-            "pressure": "%.2f" % convert_hex_to_float("".join(received_frame[16:20])),
-            "TVOC": int("".join(received_frame[20:22][::-1]), 16),
-            "ECO2": int("".join(received_frame[22:24][::-1]), 16),
-            "AQI": int(received_frame[24], 16),
-        }
+    # elif parsed_frame["sensor_info"]["type"] == 19:
+    #     # parsed_frame["sensor_info"]["name"] = "Датчик дыма и пожара"
+    #     parsed_frame["sensor_data"] = {
+    #         "smoke": int("".join(received_frame[8:10][::-1]), 16),
+    #         "fire1": int("".join(received_frame[10:12][::-1]), 16),
+    #         "fire2": int("".join(received_frame[12:14][::-1]), 16),
+    #         "fire3": int("".join(received_frame[14:16][::-1]), 16),
+    #         "fire4": int("".join(received_frame[16:18][::-1]), 16),
+    #         "brightness": int("".join(received_frame[18:20][::-1]), 16),
+    #     }
+    # elif parsed_frame["sensor_info"]["type"] == 20:
+    #     # parsed_frame["sensor_info"]["name"] = "Датчик CO2"
+    #     parsed_frame["sensor_data"] = {
+    #         "temperature": "%.2f" % convert_hex_to_float("".join(received_frame[8:12])),
+    #         "humidity": "%.2f" % convert_hex_to_float("".join(received_frame[12:16])),
+    #         "pressure": "%.2f" % convert_hex_to_float("".join(received_frame[16:20])),
+    #         "TVOC": int("".join(received_frame[20:22][::-1]), 16),
+    #         "ECO2": int("".join(received_frame[22:24][::-1]), 16),
+    #         "AQI": int(received_frame[24], 16),
+    #     }
 
     return parsed_frame
 
@@ -214,3 +221,27 @@ if __name__ == "__main__":
         print(received_data)
         parsed_data = parse_received_data(received_data)
         print(parsed_data)
+
+        ids_to_strings_dict = {
+            16: "one",
+            17: "two",
+            18: "three"
+        }
+        ids_to_names_dict = {
+            16: "controlerleack",
+            17: "controlermodule",
+            18: "controlerenviroment",
+
+        }
+
+        controller_data_name = ids_to_names_dict[parsed_data["sensor_info"]["type"]]
+        sensor_data = parsed_data.get('sensor_data')
+
+        parsed_data["sensor_info"][controller_data_name] = sensor_data
+
+        formatted_data = {
+            ids_to_strings_dict[parsed_data["sensor_info"]["type"]]: parsed_data["sensor_info"]
+
+        }
+
+        print(formatted_data)
