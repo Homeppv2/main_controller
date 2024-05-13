@@ -28,16 +28,18 @@ async def read_sensor_data() -> dict:
     parsed_data = parse_received_data(received_data.split())
 
     ids_to_strings_dict = {
-        16: "one",
-        17: "two",
-        18: "three"
+        16: "ContollersLeackMessangesData",
+        17: "ContollersEnviromentMessangesData",
+        # 18: "three"
     }
     ids_to_names_dict = {
         16: "controlerleack",
         17: "controlermodule",
-        18: "controlerenviroment",
+        # 18: "controlerenviroment",
 
     }
+    if parsed_data["sensor_info"]["type"] not in ids_to_strings_dict:
+        logger.info("Ignoring data from sensor: not in allowed ids")
 
     controller_data_name = ids_to_names_dict[parsed_data["sensor_info"]["type"]]
     sensor_data = parsed_data.get('sensor_data')
@@ -76,21 +78,21 @@ def parse_received_data(received_frame):
             "gas": int("".join(received_frame[20:22][::-1]), 16),
         }
 
-    elif parsed_frame["sensor_info"]["type"] == 18:
-        parsed_frame["sensor_data"] = {
-            "temperature": "%.2f" % convert_hex_to_float("".join(received_frame[8:12])),
-            "humidity": "%.2f" % convert_hex_to_float("".join(received_frame[12:16])),
-            "pressure": "%.2f" % convert_hex_to_float("".join(received_frame[16:20])),
-            "VOC": "%.2f" % convert_hex_to_float("".join(received_frame[20:24])),
-            "gas1": int("".join(received_frame[24:28][::-1]), 16),
-            "gas2": int("".join(received_frame[28:32][::-1]), 16),
-            "gas3": int("".join(received_frame[32:26][::-1]), 16),
-            "pm1": int("".join(received_frame[36:38][::-1]), 16),
-            "pm25": int("".join(received_frame[38:40][::-1]), 16),
-            "pm10": int("".join(received_frame[40:42][::-1]), 16),
-            "fire": int("".join(received_frame[42:44][::-1]), 16),
-            "smoke": int("".join(received_frame[44:46][::-1]), 16),
-        }
+    # elif parsed_frame["sensor_info"]["type"] == 18:
+    #     parsed_frame["sensor_data"] = {
+    #         "temperature": "%.2f" % convert_hex_to_float("".join(received_frame[8:12])),
+    #         "humidity": "%.2f" % convert_hex_to_float("".join(received_frame[12:16])),
+    #         "pressure": "%.2f" % convert_hex_to_float("".join(received_frame[16:20])),
+    #         "VOC": "%.2f" % convert_hex_to_float("".join(received_frame[20:24])),
+    #         "gas1": int("".join(received_frame[24:28][::-1]), 16),
+    #         "gas2": int("".join(received_frame[28:32][::-1]), 16),
+    #         "gas3": int("".join(received_frame[32:26][::-1]), 16),
+    #         "pm1": int("".join(received_frame[36:38][::-1]), 16),
+    #         "pm25": int("".join(received_frame[38:40][::-1]), 16),
+    #         "pm10": int("".join(received_frame[40:42][::-1]), 16),
+    #         "fire": int("".join(received_frame[42:44][::-1]), 16),
+    #         "smoke": int("".join(received_frame[44:46][::-1]), 16),
+    #     }
     # elif parsed_frame["sensor_info"]["type"] == 19:
     #     # parsed_frame["sensor_info"]["name"] = "Датчик дыма и пожара"
     #     parsed_frame["sensor_data"] = {
@@ -223,8 +225,8 @@ if __name__ == "__main__":
         print(parsed_data)
 
         ids_to_strings_dict = {
-            16: "one",
-            17: "two",
+            16: "ContollersLeackMessangesData",
+            17: "ContollersEnviromentMessangesData",
             18: "three"
         }
         ids_to_names_dict = {
