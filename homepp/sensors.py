@@ -1,8 +1,12 @@
 import asyncio
+import ctypes
 import datetime
 import logging
 import os
 import random
+from dotenv import load_dotenv
+
+load_dotenv()
 
 import aioserial
 
@@ -11,11 +15,17 @@ logger = logging.getLogger(__name__)
 GENERATE_FAKE_VALUES = bool(int(os.getenv("GENERATE_FAKE_VALUES", False)))
 
 
+def convert_hex_to_float(hex_string: str) -> float:
+    hex_string = "0" * (8 - len(hex_string)) + hex_string
+
+    converted_float = ctypes.c_float.from_buffer(bytearray.fromhex(hex_string))
+    return converted_float.value
+
+
 async def read_sensor_data() -> dict:
     serial_port = aioserial.AioSerial("/dev/ttyAMA0", 115200)
     received_data = (await serial_port.readline_async()).decode('utf-8')
     parsed_data = parse_received_data(received_data.split())
-
 
     ids_to_strings_dict = {
         16: "one",
@@ -34,60 +44,68 @@ async def read_sensor_data() -> dict:
     return formatted_data
 
 
-
-
 def parse_received_data(received_frame):
-    print(received_frame)
-    received_frame = [x if x != "0" else "00" for x in received_frame]
-    received_data = received_frame[4:]
-    parsed_data = {}
-    parsed_data["sensor_info"] = {"id": int((received_frame[0] + received_frame[1])[::-1], 16),
-                                  "number": int((received_frame[2] + received_frame[3])[::-1], 16),
-                                  "status": int((received_data[0] + received_data[1])[::-1], 16),
-                                  "charge": int(received_data[2][::-1], 16)}
+    received_frame = [("0" + x) if len(x) == 1 else x for x in received_frame]
+    parsed_frame: dict[str: int | float] = {"sensor_info": {
+        "type": int("".join(received_frame[0:2][::-1]), 16),
+        "number": int("".join(received_frame[2:4][::-1]), 16),
+        "status": int("".join(received_frame[4:6][::-1]), 16),
+        "charge": int(received_frame[6], 16)
+    }}
 
     # Разбор данных в зависимости от типа
-    if parsed_data["sensor_info"]["id"] == 16:  # Датчик протечки
-        parsed_data["sensor_data"]["name"] = "Датчик протечки"
-        parsed_data["sensor_data"] = {
-            "leak": int(received_data[3], 8)
+    if parsed_frame["sensor_info"]["type"] == 16:
+        parsed_frame["sensor_info"]["name"] = "Датчик протечки"
+        parsed_frame["sensor_data"] = {
+            "leak": int(received_frame[7], 16)
         }
-    elif parsed_data["sensor_info"]["id"] == 17:  # Модульный датчик
-        print(
-            "".join(received_data[3:7][::-1]),
-            "".join(received_data[7:11][::-1]),
-            "".join(received_data[11:15][::-1]),
-            "".join(received_data[15:19][::-1]),
-        )
-        parsed_data["sensor_info"]["name"] = "Модульный датчик"
-        parsed_data["sensor_data"] = {
-            "temperature": int("".join(received_data[3:7][::-1]), 16),
-            "humidity": int("".join(received_data[7:11][::-1]), 16),
-            "pressure": int("".join(received_data[11:15][::-1]), 16),
-            "gas": int("".join(received_data[15:19][::-1]), 16)
+    elif parsed_frame["sensor_info"]["type"] == 17:
+        parsed_frame["sensor_info"]["name"] = "Модульный датчик"
+        parsed_frame["sensor_data"] = {
+            "temperature": "%.2f" % convert_hex_to_float("".join(received_frame[8:12])),
+            "humidity": "%.2f" % convert_hex_to_float("".join(received_frame[12:16])),
+            "pressure": "%.2f" % convert_hex_to_float("".join(received_frame[16:20])),
+            "gas": int("".join(received_frame[20:22][::-1]), 16),
         }
 
-
-    elif parsed_data["sensor_info"]["id"] == 18:  # Датчик окружающей среды
-        parsed_data["sensor_info"]["name"] = "Датчик окружающей среды"
-
-        parsed_data["sensor_data"] = {
-            "temperature": int("".join(received_data[3:7][::-1]), 16),
-            "humidity": int("".join(received_data[7:11][::-1]), 16),
-            "pressure": int("".join(received_data[11:15][::-1]), 16),
-            "VOC": int("".join(received_data[15:19][::-1]), 16),
-            "gas1": int("".join(received_data[19:23][::-1]), 16),
-            "gas2": int("".join(received_data[23:27][::-1]), 16),
-            "gas3": int("".join(received_data[27:31][::-1]), 16),
-            "pm1": int("".join(received_data[31:33][::-1]), 16),
-            "pm25": int("".join(received_data[33:35][::-1]), 16),
-            "pm10": int("".join(received_data[35:37][::-1]), 16),
-            "fire": int("".join(received_data[37:39][::-1]), 16),
-            "smoke": int(received_data[39], 16)
+    elif parsed_frame["sensor_info"]["type"] == 18:
+        parsed_frame["sensor_info"]["name"] = "Датчик окружающей среды"
+        parsed_frame["sensor_data"] = {
+            "temperature": "%.2f" % convert_hex_to_float("".join(received_frame[8:12])),
+            "humidity": "%.2f" % convert_hex_to_float("".join(received_frame[12:16])),
+            "pressure": "%.2f" % convert_hex_to_float("".join(received_frame[16:20])),
+            "VOC": "%.2f" % convert_hex_to_float("".join(received_frame[20:24])),
+            "gas1": int("".join(received_frame[24:28][::-1]), 16),
+            "gas2": int("".join(received_frame[28:32][::-1]), 16),
+            "gas3": int("".join(received_frame[32:26][::-1]), 16),
+            "pm1": int("".join(received_frame[36:38][::-1]), 16),
+            "pm25": int("".join(received_frame[38:40][::-1]), 16),
+            "pm10": int("".join(received_frame[40:42][::-1]), 16),
+            "fire": int("".join(received_frame[42:44][::-1]), 16),
+            "smoke": int("".join(received_frame[44:46][::-1]), 16),
+        }
+    elif parsed_frame["sensor_info"]["type"] == 19:
+        parsed_frame["sensor_info"]["name"] = "Датчик дыма и пожара"
+        parsed_frame["sensor_data"] = {
+            "smoke": int("".join(received_frame[8:10][::-1]), 16),
+            "fire1": int("".join(received_frame[10:12][::-1]), 16),
+            "fire2": int("".join(received_frame[12:14][::-1]), 16),
+            "fire3": int("".join(received_frame[14:16][::-1]), 16),
+            "fire4": int("".join(received_frame[16:18][::-1]), 16),
+            "brightness": int("".join(received_frame[18:20][::-1]), 16),
+        }
+    elif parsed_frame["sensor_info"]["type"] == 20:
+        parsed_frame["sensor_info"]["name"] = "Датчик CO2"
+        parsed_frame["sensor_data"] = {
+            "temperature": "%.2f" % convert_hex_to_float("".join(received_frame[8:12])),
+            "humidity": "%.2f" % convert_hex_to_float("".join(received_frame[12:16])),
+            "pressure": "%.2f" % convert_hex_to_float("".join(received_frame[16:20])),
+            "TVOC": int("".join(received_frame[20:22][::-1]), 16),
+            "ECO2": int("".join(received_frame[22:24][::-1]), 16),
+            "AQI": int(received_frame[24], 16),
         }
 
-
-    return parsed_data
+    return parsed_frame
 
 
 # if GENERATE_FAKE_VALUES:
@@ -180,15 +198,18 @@ def parse_received_data(received_frame):
 
 if __name__ == "__main__":
     for received_data in (
-            ['11', '0', '1', '0', '0', '0', 'FF', '0', '1F', '85', 'CF', '41', '0', '57', '4', '42', '71', 'C2', '79',
-             '44',
-             '0', '0', 'C0'],
-            ['11', '0', '1', '0', '0', '0', 'FF', '0', '5C', '8F', 'D0', '41', '0', '83', '6', '42', '38', 'C1', '79',
-             '44',
-             '0', '0', 'C0'],
-            ['11', '0', '1', '0', '0', '0', 'FF', '0', 'A', 'D7', 'D1', '41', '0', '73', '8', '42', 'EC', 'C0', '79',
-             '44', '0',
-             '0', 'C0']
+            # ['11', '0', '1', '0', '0', '0', 'FF', '0', '1F', '85', 'CF', '41', '0', '57', '4', '42', '71', 'C2', '79',
+            #  '44',
+            #  '0', '0', 'C0'],
+            # ['11', '0', '1', '0', '0', '0', 'FF', '0', '5C', '8F', 'D0', '41', '0', '83', '6', '42', '38', 'C1', '79',
+            #  '44',
+            #  '0', '0', 'C0'],
+            # ['11', '0', '1', '0', '0', '0', 'FF', '0', 'A', 'D7', 'D1', '41', '0', '73', '8', '42', 'EC', 'C0', '79',
+            #  '44', '0',
+            #  '0', 'C0'],
+            # "11 0 1 0 1 0 ff 0 0 0 0 0 5c 8f ae 41 0 7 31 42 80 89 78 44 30 0 0 0".split(),
+            "11 0 1 0 1 0 ff 0 52 b8 d6 41 0 a e 42 a9 f3 76 44 2b 0".split(),
+
     ):
         print(received_data)
         parsed_data = parse_received_data(received_data)

@@ -6,6 +6,9 @@ import asyncio
 import custom_logger
 import websocket_client
 import sensors
+from dotenv import load_dotenv
+
+load_dotenv()
 
 logger = custom_logger.setup_logger()
 
@@ -14,7 +17,6 @@ async def main():
     # todo: move to separate config file
     WEBSOCKET_URL = os.getenv("WEBSOCKET_URL", "123")
     HARDWARE_KEY = os.getenv("HARDWARE_KEY", "1234")
-    # DEBUG = os.getenv("DEBUG", False)
 
     while True:
         try:
