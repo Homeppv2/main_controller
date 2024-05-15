@@ -29,7 +29,7 @@ async def read_sensor_data() -> dict:
 
     ids_to_strings_dict = {
         16: "ContollersLeackMessangesData",
-        17: "ContollersModuleMessangesData",
+        17: "ControlerModuleDataMessange",
         # 18: "ContollersEnviromentMessangesData",
         # 18: "three"
     }
