@@ -15,29 +15,71 @@ logger = logging.getLogger(__name__)
 GENERATE_FAKE_VALUES = bool(int(os.getenv("GENERATE_FAKE_VALUES", False)))
 
 
-def convert_hex_to_float(hex_string: str) -> float:
-    hex_string = "0" * (8 - len(hex_string)) + hex_string
+def bytes_from_octal(octal_string):
+    # Разбиваем строку на группы по 2 символа
+    octal_numbers = [octal_string[i:i + 2] for i in range(0, len(octal_string), 2)]
 
-    converted_float = ctypes.c_float.from_buffer(bytearray.fromhex(hex_string))
+    # Преобразуем каждое восьмеричное число в десятичное, а затем в байт
+    byte_array = bytearray(int(octal, 8) for octal in octal_numbers)
+
+    return bytes(byte_array)
+
+
+# Пример использования
+octal_string = '25 2'
+result = bytes_from_octal(octal_string)
+print(result)
+
+# Пример использования
+octal_string = '141157'
+result = bytes_from_octal(octal_string)
+print(result)
+
+
+def convert_hex_to_float(hex_string: str, _=16) -> float:
+    hex_string = "0" * (8 - len(hex_string)) + hex_string
+    print(f"{hex_string=}")
+    print(f"{_=}")
+    if _ == 8:
+        buffer = bytes_from_octal(hex_string)
+        print(f"{buffer=}")
+    else:
+        buffer = None
+
+    converted_float = ctypes.c_float.from_buffer(bytearray.fromhex(hex_string) if buffer is None else buffer)
     return converted_float.value
+
+    # def convert_hex_to_float(hex_str, a=16):
+    #     import struct
+    #     if a == 16:
+    #         buffer = bytes.fromhex(hex_str)
+    #     elif a == 8:
+    #         buffer = bytes_from_octal(hex_str)
+    #     else:
+    #         raise ValueError
+    #     return struct.unpack('!f', buffer)[0]
 
 
 async def read_sensor_data() -> dict:
     serial_port = aioserial.AioSerial("/dev/ttyAMA0", 115200)
     received_data = (await serial_port.readline_async()).decode('utf-8')
-    parsed_data = parse_received_data(received_data.split())
+
+    try:
+        parsed_data = parse_received_data(received_data.split())
+    except Exception as e:
+        logger.error("Ran into %s while parsing data. Exiting", e),
+        return
 
     ids_to_strings_dict = {
         16: "ContollersLeackMessangesData",
-        17: "ControlerModuleDataMessange",
-        # 18: "ContollersEnviromentMessangesData",
+        17: "ContollersModuleMessangesData",
+        18: "ControlerEnviromentDataMessange",
         # 18: "three"
     }
     ids_to_names_dict = {
         16: "controlerleack",
         17: "controlermodule",
-        # 18: "controlerenviroment",
-
+        18: "controlerenviroment",
     }
     if parsed_data["sensor_info"]["type"] not in ids_to_strings_dict:
         logger.info("Ignoring data from sensor: not in allowed ids")
@@ -71,29 +113,42 @@ def parse_received_data(received_frame):
             "leack": int(received_frame[8], 16)
         }
     elif parsed_frame["sensor_info"]["type"] == 17:
-
         parsed_frame["sensor_data"] = {
-            "temperature": "%.2f" % convert_hex_to_float("".join(received_frame[8:12])),
-            "humidity": "%.2f" % convert_hex_to_float("".join(received_frame[12:16])),
-            "pressure": "%.2f" % convert_hex_to_float("".join(received_frame[16:20])),
-            "gas": int("".join(received_frame[20:22][::-1]), 16),
+            "temperature": int("%.2f" % convert_hex_to_float("".join(received_frame[8:12]))),
+            "humidity": int("%.2f" % convert_hex_to_float("".join(received_frame[12:16]))),
+            "pressure": int("%.2f" % convert_hex_to_float("".join(received_frame[16:20]))),
+            "gas": int(("".join(received_frame[20:22][::-1]), 16)),
         }
 
-    # elif parsed_frame["sensor_info"]["type"] == 18:
-    #     parsed_frame["sensor_data"] = {
-    #         "temperature": "%.2f" % convert_hex_to_float("".join(received_frame[8:12])),
-    #         "humidity": "%.2f" % convert_hex_to_float("".join(received_frame[12:16])),
-    #         "pressure": "%.2f" % convert_hex_to_float("".join(received_frame[16:20])),
-    #         "VOC": "%.2f" % convert_hex_to_float("".join(received_frame[20:24])),
-    #         "gas1": int("".join(received_frame[24:28][::-1]), 16),
-    #         "gas2": int("".join(received_frame[28:32][::-1]), 16),
-    #         "gas3": int("".join(received_frame[32:26][::-1]), 16),
-    #         "pm1": int("".join(received_frame[36:38][::-1]), 16),
-    #         "pm25": int("".join(received_frame[38:40][::-1]), 16),
-    #         "pm10": int("".join(received_frame[40:42][::-1]), 16),
-    #         "fire": int("".join(received_frame[42:44][::-1]), 16),
-    #         "smoke": int("".join(received_frame[44:46][::-1]), 16),
-    #     }
+    elif parsed_frame["sensor_info"]["type"] == 18:
+        parsed_frame["sensor_data"] = {
+
+            "temperature": "%.2f" % convert_hex_to_float("".join(received_frame[8:12])),
+
+            "humidity": "%.2f" % convert_hex_to_float("".join(received_frame[12:16])),
+
+            "pressure": "%.2f" % convert_hex_to_float("".join(received_frame[16:20])),
+
+            "VOC": "%.2f" % convert_hex_to_float("".join(received_frame[20:24])),
+
+            "gas1": int("".join(received_frame[24:26][::-1]), 16),
+
+            "gas2": int("".join(received_frame[26:28][::-1]), 16),
+
+            "gas3": int("".join(received_frame[28:30][::-1]), 16),
+
+            "pm1": int("".join(received_frame[30:32][::-1]), 16),
+
+            "pm25": int("".join(received_frame[32:34][::-1]), 16),
+
+            "pm10": int("".join(received_frame[34:36][::-1]), 16),
+
+            "fire": int("".join(received_frame[36:38][::-1]), 16),
+
+            "smoke": int("".join(received_frame[38:40][::-1]), 16),
+
+
+        }
     # elif parsed_frame["sensor_info"]["type"] == 19:
     #     # parsed_frame["sensor_info"]["name"] = "Датчик дыма и пожара"
     #     parsed_frame["sensor_data"] = {
@@ -218,7 +273,7 @@ if __name__ == "__main__":
             #  '44', '0',
             #  '0', 'C0'],
             # "11 0 1 0 1 0 ff 0 0 0 0 0 5c 8f ae 41 0 7 31 42 80 89 78 44 30 0 0 0".split(),
-            "11 0 1 0 1 0 ff 0 52 b8 d6 41 0 a e 42 a9 f3 76 44 2b 0".split(),
+            "12 0 1 0 0 0 ff 0 0 0 d4 41 50 d 1b 42 7c b4 79 44 ec d1 4 45 59 0 8 0 6 0 0 0 0 0 0 0 ff 3 0 0".split(),
 
     ):
         print(received_data)
